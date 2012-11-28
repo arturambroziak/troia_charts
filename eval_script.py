@@ -34,26 +34,36 @@ def compare_object_results(correct_objs, objs):
     return 100 * cnt / len(objs)
 
 def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
+    '''
+        @return: tuple of: labels fitness, computation time
+    '''
     job_id = "123"
-    iterations = kwargs.get("iterations", 10)
+    iterations = kwargs.get("iterations", 100)
     
     dsas.ping()
     dsas.reset(job_id)
 
+    t1 = datetime.datetime.now()
     dsas.load_categories(transform_cost(cost), job_id)
     dsas.load_gold_labels(gold_labels, job_id)
     dsas.load_worker_assigned_labels(labels, job_id)
     dsas.compute_non_blocking(iterations, job_id)
-    while 'true' not in dsas.is_computed(job_id):
-        time.sleep(2)
+    dsas.is_computed(job_id)
+    t2 = datetime.datetime.now()
+    
 #        print dsas.print_worker_summary(False, job_id)
     res_objects = dsas.majority_votes(job_id)
-    return compare_object_results(correct_objs, res_objects['result'])
+    return compare_object_results(correct_objs, res_objects['result']), (t2 - t1).seconds
 
 if __name__ == "__main__":
     data = load_all(sys.argv[1])
-    with open('demo/iterations.csv', 'ab') as csvfile:
-        spamwriter = csv.writer(csvfile, delimiter='\t')
-        for i in xrange(1, 15, 14):
-            kwargs = {"iterations": i}
-            spamwriter.writerow([datetime.date.today(), test_server(dsas, *data, **kwargs)])
+    today = datetime.date.today()
+    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
+        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
+        timings_writer = csv.writer(timing_file, delimiter='\t')
+#        for i in xrange(1, 15, 14):
+#            kwargs = {"iterations": i}
+        kwargs = {}
+        fitness, timing = test_server(dsas, *data, **kwargs)
+        labels_fitness_writer.writerow([today, fitness])
+        timings_writer.writerow([today, timing])
