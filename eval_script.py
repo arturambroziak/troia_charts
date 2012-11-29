@@ -38,7 +38,7 @@ def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
         @return: tuple of: labels fitness, computation time
     '''
     job_id = "123"
-    iterations = kwargs.get("iterations", 100)
+    iterations = kwargs.get("iterations", 1000)
     
     dsas.ping()
     dsas.reset(job_id)
@@ -56,14 +56,23 @@ def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
     return compare_object_results(correct_objs, res_objects['result']), (t2 - t1).seconds
 
 if __name__ == "__main__":
-    data = load_all(sys.argv[1])
     today = datetime.date.today()
-    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
-        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
-        timings_writer = csv.writer(timing_file, delimiter='\t')
+    timings = []
+    fitnesses = []
+
+    for dataset in ('small', 'medium', 'big'):
+        print dataset
+        data = load_all("examples/{}/".format(dataset), prefix="{}_".format(dataset))
 #        for i in xrange(1, 15, 14):
 #            kwargs = {"iterations": i}
         kwargs = {}
         fitness, timing = test_server(dsas, *data, **kwargs)
-        labels_fitness_writer.writerow([today, fitness])
-        timings_writer.writerow([today, timing])
+        print fitness, timing
+        fitnesses.append(fitness)
+        timings.append(timing)
+        
+    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
+        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
+        timings_writer = csv.writer(timing_file, delimiter='\t')
+        labels_fitness_writer.writerow([today] + fitnesses)
+        timings_writer.writerow([today] + timings)
