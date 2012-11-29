@@ -38,7 +38,7 @@ def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
         @return: tuple of: labels fitness, computation time
     '''
     job_id = "123"
-    iterations = kwargs.get("iterations", 1000)
+    iterations = kwargs.get("iterations", 30)
     
     dsas.ping()
     dsas.reset(job_id)
