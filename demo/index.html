@@ -1,44 +1,62 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+<link href="css/bootstrap-responsive.min.css" rel="stylesheet">
 <style>
-	body {
-	  font: 10px sans-serif;
-	}
-	
-	.axis path,
-	.axis line {
-	  fill: none;
-	  stroke: #000;
-	  shape-rendering: crispEdges;
-	}
-	
-	.x.axis path {
-	  display: none;
-	}
-	
-	.line {
-	  fill: none;
-	  stroke: steelblue;
-	  stroke-width: 1.5px;
-	}
+body {
+	font: 10px sans-serif;
+}
+
+.axis path,.axis line {
+	fill: none;
+	stroke: #000;
+	shape-rendering: crispEdges;
+}
+
+.x.axis path {
+	display: none;
+}
+
+.line {
+	fill: none;
+	stroke: orange;
+	stroke-width: 2.5px;
+}
+
+.bar {
+	fill: darkblue;
+}
 </style>
 <body>
-	<div>
-		<h3>Labels fitness</h3>
-		<div id="label_fit_chart"></div>
-	</div>
-	<div>
-		<h3>Computation time</h3>
-		<div id="time_chart"></div>
-	</div>
-	<div>
-		<h3>Used data sets from test generator (3 categories, max 30 iterations):</h3>
-		<ul>
-			<li>small: objects: 100, workers: 5, workers per objects: 3 (300 votes), gold ratio: 0.1, minimal worker quality: 0.6, maximal worker quality: 1</li>
-			<li>medium: objects: 1000, workers: 20, workers per objects: 3 (3000 votes), gold ratio: 0.1, minimal worker quality: 0.6, maximal worker quality: 1</li>
-			<li>big: objects: 10000, workers: 200, workers per objects: 3 (30000 votes), gold ratio: 0.005, minimal worker quality: 0.8, maximal worker quality: 1</li>
-		</ul>
+	<div class="container">
+		<div class="row">
+			<div class="span6">
+				<h3>Labels fitness</h3>
+				<div id="label_fit_chart"></div>
+				<h3>Computation time</h3>
+				<div id="time_chart"></div>
+			</div>
+			<div class="span6" id="workers_quality">
+				<h4>Used data sets from test generator (3 categories, max 30
+					iterations):</h4>
+				<ul>
+					<li>small: objects: 100, workers: 5, workers per objects: 3
+						(300 votes), gold ratio: 0.1, minimal worker quality: 0.6, maximal
+						worker quality: 1</li>
+					<li>medium: objects: 1000, workers: 20, workers per objects: 3
+						(3000 votes), gold ratio: 0.1, minimal worker quality: 0.6,
+						maximal worker quality: 1</li>
+					<li>big: objects: 10000, workers: 200, workers per objects: 3
+						(30000 votes), gold ratio: 0.005, minimal worker quality: 0.8,
+						maximal worker quality: 1</li>
+				</ul>
+				<h2>Workers quality:</h2>
+				<!-- here js append worker quality charts -->
+			</div>
+		</div>
 	</div>
 	<script src="http://d3js.org/d3.v3.js"></script>
-	<script type="text/javascript" src="chart.js" charset="utf-8"></script>
+	<script type="text/javascript" src="js/chart.js" charset="utf-8"></script>
+	<script src="http://code.jquery.com/jquery-latest.js"></script>
+	<script src="js/bootstrap.min.js"></script>
 </body>

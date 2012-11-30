@@ -1,5 +1,5 @@
 var margin = {top: 30, right: 30, bottom: 30, left: 30},
-	width = 600 - margin.left - margin.right,
+	width = 500 - margin.left - margin.right,
 	height = 400 - margin.top - margin.bottom;
 
 var parseDate = d3.time.format("%Y-%m-%d").parse;
@@ -30,38 +30,33 @@ var add_line_chart = function(place, datafile, y_axis_txt){
 	    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 	
 	d3.tsv(datafile, function(error, data) {
-	  data.forEach(function(d) {
-	    d.date = parseDate(d.date);
-	    d.value = +d.value;
-	  });
+		
+		x.domain(d3.extent(data, function(d) { return d.date; }));
+		y.domain(d3.extent(data, function(d) { return d.value; }));
 	
-	  x.domain(d3.extent(data, function(d) { return d.date; }));
-	  y.domain(d3.extent(data, function(d) { return d.value; }));
+		svg.append("g")
+			.attr("class", "x axis")
+			.attr("transform", "translate(0," + height + ")")
+			.call(xAxis);
 	
-	  svg.append("g")
-	      .attr("class", "x axis")
-	      .attr("transform", "translate(0," + height + ")")
-	      .call(xAxis);
+		svg.append("g")
+	    	.attr("class", "y axis")
+	    	.call(yAxis)
+	      .append("text")
+	    	.attr("transform", "rotate(-90)")
+	    	.attr("y", 6)
+	    	.attr("dy", ".71em")
+	    	.style("text-anchor", "end")
+	    	.text(y_axis_txt);
 	
-	  svg.append("g")
-	      .attr("class", "y axis")
-	      .call(yAxis)
-	    .append("text")
-	      .attr("transform", "rotate(-90)")
-	      .attr("y", 6)
-	      .attr("dy", ".71em")
-	      .style("text-anchor", "end")
-	      .text(y_axis_txt);
-	
-	  svg.append("path")
-	      .datum(data)
-	      .attr("class", "line")
-	      .attr("d", line);
+		svg.append("path")
+	  		.datum(data)
+	  		.attr("class", "line")
+	  		.attr("d", line);
 	});
 };
 
-
-var add_multiline_chart = function(place, datafile, y_axis_txt){
+var add_multiline_chart = function(place, datafile1, datafile2, y_axis_txt){
 	var x = d3.time.scale()
     	.range([0, width]);
 
@@ -89,7 +84,7 @@ var add_multiline_chart = function(place, datafile, y_axis_txt){
 	  .append("g")
 	    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 	
-	d3.tsv(datafile, function(error, data) {
+	d3.tsv(datafile1, function(error, data) {
 	  color.domain(d3.keys(data[0]).filter(function(key) { return key !== "date"; }));
 	
 	  data.forEach(function(d) {
@@ -146,5 +141,79 @@ var add_multiline_chart = function(place, datafile, y_axis_txt){
 	});
 }
 
+var add_bar_chart = function(place, datafile1, datafile2, y_axis_txt){
+	var height = 300 - margin.top - margin.bottom;
+	var x = d3.scale.ordinal()
+	    .rangeRoundBands([0, width], .1);
+
+	var y = d3.scale.linear()
+	    .range([height, 0]);
+
+	var xAxis = d3.svg.axis()
+	    .scale(x)
+	    .orient("bottom");
+
+	var yAxis = d3.svg.axis()
+	    .scale(y)
+	    .orient("left");
+	
+	var line = d3.svg.line()
+		.x(function(d) { return x(d.interval) + x.rangeBand()/2; })
+		.y(function(d) { return y(d.value); });
+
+	var svg = d3.select(place).append("svg")
+	    .attr("width", width + margin.left + margin.right)
+	    .attr("height", height + margin.top + margin.bottom)
+	  .append("g")
+	    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+	d3.tsv(datafile1, function(error, data) {
+
+	  x.domain(data.map(function(d) { return d.interval; }));
+	  y.domain([0, d3.max(data, function(d) { return d.value; })]);
+
+	  svg.append("g")
+	      .attr("class", "x axis")
+	      .attr("transform", "translate(0," + height + ")")
+	      .call(xAxis);
+
+	  svg.append("g")
+	      .attr("class", "y axis")
+	      .call(yAxis)
+	    .append("text")
+	      .attr("transform", "rotate(-90)")
+	      .attr("y", 6)
+	      .attr("dy", ".71em")
+	      .style("text-anchor", "end")
+	      .text(y_axis_txt);
+
+	  svg.selectAll(".bar")
+	      .data(data)
+	    .enter().append("rect")
+	      .attr("class", "bar")
+	      .attr("x", function(d) { return x(d.interval); })
+	      .attr("width", x.rangeBand())
+	      .attr("y", function(d) { return y(d.value); })
+	      .attr("height", function(d) { return height - y(d.value); });
+	});
+	
+	d3.tsv(datafile2, function(error, data) {
+		svg.append("path")
+			.datum(data)
+			.attr("class", "line")
+			.attr("d", line);
+	});
+}
+
 add_multiline_chart("#label_fit_chart", "label_fit.csv", "Labels fitness (in %)");
-add_multiline_chart("#time_chart", "time.csv", "Comptation timing (in seconds)");
+add_multiline_chart("#time_chart", "time.csv", "Computation timing (in seconds)");
+
+var datasets =['small', 'medium', 'big']; 
+for (var t in datasets){
+	d3.select("#workers_quality").append("h4").text(datasets[t] + " data set");
+	d3.select("#workers_quality").append("div").attr("id", "workers_quality_"+datasets[t]);
+	add_bar_chart("#workers_quality_"+datasets[t], 
+			"workers_assumed_quality_"+datasets[t]+".csv", 
+			"workers_real_quality_"+datasets[t]+".csv", 
+			"Amount");
+}

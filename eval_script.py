@@ -1,18 +1,68 @@
-import sys
-import time
 import csv
 import datetime
+import json
 
 from troia_client import TroiaClient
 
 dsas = TroiaClient("http://localhost:8080/GetAnotherLabel/rest/", None)
 main_path = "examples/"
 
+
+def drange(start, stop, step):
+    r = start
+    while r < stop:
+        yield r
+        r += step
+
 def load_all(path, prefix="testData_", suffix=".txt"):
     r = [list(csv.reader(open(path + s), delimiter='\t'))
             for s in ['/{}goldLabels{}'.format(prefix, suffix), '/{}cost{}'.format(prefix, suffix), '/{}labels{}'.format(prefix, suffix), '/{}objects{}'.format(prefix, suffix)]]
     r[0] = [x[-2:] for x in r[0]]
     return r
+
+def load_aiworker(path, prefix="testData_", suffix=".txt"):
+    with open(path + '/{}aiworker{}'.format(prefix, suffix)) as aiworker_file:
+        return json.load(aiworker_file)
+    
+def get_workers_quality(workers):
+    ret = []
+    for w in workers:
+        avg = 0
+        for cat, val in w['confusionMatrix']['matrix'].items():
+            avg += val[cat]
+        ret.append(avg / len(w['confusionMatrix']['matrix']))
+    return ret
+
+def get_workers_real_quality(labels, correct_obj):
+    correct_obj_dict = {}
+    for obj, cat in correct_obj:
+        correct_obj_dict[obj] = cat
+
+    workers_good_answers = {}
+    for wor, obj, cat in labels:
+        worker_good_answer = workers_good_answers.get(wor, [0, 0])
+        if correct_obj_dict[obj] == cat:
+            worker_good_answer[0] += 1
+        worker_good_answer[1] += 1
+        workers_good_answers[wor] = worker_good_answer
+    ret = []
+    for _, val in workers_good_answers.items():
+        ret.append(float(val[0]) / val[1])
+    return ret
+
+def aggregate_values(minv, maxv, cnt, values):
+    ret = {}
+    for i in drange(minv, maxv, (maxv - minv) / cnt):
+        ret[i] = 0
+    for v in values:
+        min_dist = 100
+        t = 0
+        for r in drange(minv, maxv, (maxv - minv) / cnt):
+            if abs(r - v) < min_dist:
+                min_dist = abs(r - v)
+                t = r
+        ret[t] += 1
+    return ret
 
 def transform_cost(cost):
     dictt = {}
@@ -21,9 +71,6 @@ def transform_cost(cost):
         el[c2] = cost_
         dictt[c1] = el
     return dictt.items()
-
-def load_objects():
-    pass
 
 def compare_object_results(correct_objs, objs):
     cnt = 0
@@ -59,20 +106,37 @@ if __name__ == "__main__":
     today = datetime.date.today()
     timings = []
     fitnesses = []
-
+    intervals = {"small": (0.6, 1.),
+                 "medium": (0.6, 1.),
+                 "big": (0.8, 1.)}
     for dataset in ('small', 'medium', 'big'):
         print dataset
-        data = load_all("examples/{}/".format(dataset), prefix="{}_".format(dataset))
-#        for i in xrange(1, 15, 14):
-#            kwargs = {"iterations": i}
+        path = "examples/{}/".format(dataset)
+        prefix = "{}_".format(dataset)
+        data = load_all(path, prefix)
+        workers = load_aiworker(path, prefix)
         kwargs = {}
-        fitness, timing = test_server(dsas, *data, **kwargs)
-        print fitness, timing
-        fitnesses.append(fitness)
-        timings.append(timing)
+#        fitness, timing = test_server(dsas, *data, **kwargs)
+#        print fitness, timing
+#        fitnesses.append(fitness)
+#        timings.append(timing)
+        workers_assumed_quality = get_workers_quality(workers)
+        workers_real_quality = get_workers_real_quality(data[2], data[3])
+        with open('demo/workers_assumed_quality_{}.csv'.format(dataset), 'w') as workers_assumed_quality_file, \
+             open('demo/workers_real_quality_{}.csv'.format(dataset), "w") as workers_real_quality_file:
+            workers_assumed_quality_writer = csv.writer(workers_assumed_quality_file, delimiter='\t')
+            workers_assumed_quality_writer.writerow(['interval', 'value'])
+            workers_real_quality_writer = csv.writer(workers_real_quality_file, delimiter='\t')
+            workers_real_quality_writer.writerow(['interval', 'value'])
+            vals = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_assumed_quality)
+            for key in sorted(vals.iterkeys()):
+                workers_assumed_quality_writer.writerow([key, vals[key]])
+            vals = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_real_quality)
+            for key in sorted(vals.iterkeys()):
+                workers_real_quality_writer.writerow([key, vals[key]])
         
-    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
-        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
-        timings_writer = csv.writer(timing_file, delimiter='\t')
-        labels_fitness_writer.writerow([today] + fitnesses)
-        timings_writer.writerow([today] + timings)
+#    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
+#        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
+#        timings_writer = csv.writer(timing_file, delimiter='\t')
+#        labels_fitness_writer.writerow([today] + fitnesses)
+#        timings_writer.writerow([today] + timings)
