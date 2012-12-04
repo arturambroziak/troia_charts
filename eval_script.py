@@ -122,18 +122,13 @@ if __name__ == "__main__":
 #        timings.append(timing)
         workers_assumed_quality = get_workers_quality(workers)
         workers_real_quality = get_workers_real_quality(data[2], data[3])
-        with open('demo/workers_assumed_quality_{}.csv'.format(dataset), 'w') as workers_assumed_quality_file, \
-             open('demo/workers_real_quality_{}.csv'.format(dataset), "w") as workers_real_quality_file:
-            workers_assumed_quality_writer = csv.writer(workers_assumed_quality_file, delimiter='\t')
-            workers_assumed_quality_writer.writerow(['interval', 'value'])
-            workers_real_quality_writer = csv.writer(workers_real_quality_file, delimiter='\t')
-            workers_real_quality_writer.writerow(['interval', 'value'])
-            vals = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_assumed_quality)
-            for key in sorted(vals.iterkeys()):
-                workers_assumed_quality_writer.writerow([key, vals[key]])
-            vals = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_real_quality)
-            for key in sorted(vals.iterkeys()):
-                workers_real_quality_writer.writerow([key, vals[key]])
+        with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
+            workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
+            workers_quality_writer.writerow(['interval', 'assumed', 'real'])
+            vals1 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_assumed_quality)
+            vals2 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_real_quality)
+            for key in sorted(vals1.iterkeys()):
+                workers_quality_writer.writerow([key, vals1[key], vals2[key]])
         
 #    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
 #        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
