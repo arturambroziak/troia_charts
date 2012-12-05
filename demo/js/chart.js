@@ -305,6 +305,6 @@ for (var t in datasets){
 	d3.select("#workers_quality").append("div").attr("id", "workers_quality_"+datasets[t]);
 	add_bar_chart("#workers_quality_"+datasets[t], 
 			"workers_quality_"+datasets[t]+".csv",
-			datasets[t], "Amount", "Worker quality", '', ['real', 'assumed'], true);
+			datasets[t], "Amount", "Worker quality", '', ['real', 'assumed', 'estimated'], true);
 	d3.select("#workers_quality").append("div").attr("id", "workers_quality_"+datasets[t]+"_mode");
 }

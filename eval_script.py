@@ -6,7 +6,7 @@ from troia_client import TroiaClient
 
 dsas = TroiaClient("http://localhost:8080/GetAnotherLabel/rest/", None)
 main_path = "examples/"
-
+job_id = "aatest"
 
 def drange(start, stop, step):
     r = start
@@ -24,7 +24,7 @@ def load_aiworker(path, prefix="testData_", suffix=".txt"):
     with open(path + '/{}aiworker{}'.format(prefix, suffix)) as aiworker_file:
         return json.load(aiworker_file)
     
-def get_workers_quality(workers):
+def get_workers_assumed_quality(workers):
     ret = []
     for w in workers:
         avg = 0
@@ -49,6 +49,9 @@ def get_workers_real_quality(labels, correct_obj):
     for _, val in workers_good_answers.items():
         ret.append(float(val[0]) / val[1])
     return ret
+
+def get_workers_estimated_quality(dsas, workers):
+    return [dsas.get_worker_cost(job_id, None, str(w['name']))['result'] for w in workers]
 
 def aggregate_values(minv, maxv, cnt, values):
     ret = {}
@@ -84,7 +87,6 @@ def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
         @return: tuple of: labels fitness, computation time
     '''
-    job_id = "123"
     iterations = kwargs.get("iterations", 30)
     
     dsas.ping()
@@ -106,9 +108,9 @@ if __name__ == "__main__":
     today = datetime.date.today()
     timings = []
     fitnesses = []
-    intervals = {"small": (0.6, 1.),
-                 "medium": (0.6, 1.),
-                 "big": (0.8, 1.)}
+    intervals = {"small": (0.0, 1.),
+                 "medium": (0.0, 1.),
+                 "big": (0.0, 1.)}
     for dataset in ('small', 'medium', 'big'):
         print dataset
         path = "examples/{}/".format(dataset)
@@ -116,22 +118,24 @@ if __name__ == "__main__":
         data = load_all(path, prefix)
         workers = load_aiworker(path, prefix)
         kwargs = {}
-#        fitness, timing = test_server(dsas, *data, **kwargs)
-#        print fitness, timing
-#        fitnesses.append(fitness)
-#        timings.append(timing)
-        workers_assumed_quality = get_workers_quality(workers)
+        fitness, timing = test_server(dsas, *data, **kwargs)
+        print fitness, timing
+        fitnesses.append(fitness)
+        timings.append(timing)
+        workers_assumed_quality = get_workers_assumed_quality(workers)
         workers_real_quality = get_workers_real_quality(data[2], data[3])
+        workers_estimated_quality = get_workers_estimated_quality(dsas, workers)
         with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
             workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
-            workers_quality_writer.writerow(['interval', 'assumed', 'real'])
-            vals1 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_assumed_quality)
-            vals2 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 10, workers_real_quality)
+            workers_quality_writer.writerow(['interval', 'assumed', 'real', 'estimated'])
+            vals1 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 20, workers_assumed_quality)
+            vals2 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 20, workers_real_quality)
+            vals3 = aggregate_values(intervals[dataset][0], intervals[dataset][1], 20, workers_estimated_quality)
             for key in sorted(vals1.iterkeys()):
-                workers_quality_writer.writerow([key, vals1[key], vals2[key]])
+                workers_quality_writer.writerow([key, vals1[key], vals2[key], vals3[key]])
         
-#    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
-#        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
-#        timings_writer = csv.writer(timing_file, delimiter='\t')
-#        labels_fitness_writer.writerow([today] + fitnesses)
-#        timings_writer.writerow([today] + timings)
+    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
+        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
+        timings_writer = csv.writer(timing_file, delimiter='\t')
+        labels_fitness_writer.writerow([today] + fitnesses)
+        timings_writer.writerow([today] + timings)
