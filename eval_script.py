@@ -53,6 +53,22 @@ def get_workers_real_quality(labels, correct_obj):
 def get_workers_estimated_quality(dsas, workers):
     return [dsas.get_worker_cost(job_id, None, str(w['name']))['result'] for w in workers]
 
+def get_data_estimated_quality(dsas, objects, categories):
+    dsas.calculate_estimated_cost(job_id)
+    obj_qualities = 0.
+    for o in objects:
+        obj_quality = 1.
+        for c in categories:
+            obj_quality *= dsas.get_estimated_cost(job_id, o, c)['result']
+        obj_qualities += 1. - obj_quality
+    return obj_qualities / len(objects)
+
+def get_categories(cost):
+    s = set()
+    for c1, c2, c in cost:
+        s.add(c1)
+    return s
+    
 def aggregate_values(minv, maxv, cnt, values):
     ret = {}
     for i in drange(minv, maxv, (maxv - minv) / cnt):
@@ -108,6 +124,7 @@ if __name__ == "__main__":
     today = datetime.date.today()
     timings = []
     fitnesses = []
+    data_quality = []
     intervals = {"small": (0.0, 1.),
                  "medium": (0.0, 1.),
                  "big": (0.0, 1.)}
@@ -116,6 +133,8 @@ if __name__ == "__main__":
         path = "examples/{}/".format(dataset)
         prefix = "{}_".format(dataset)
         data = load_all(path, prefix)
+        categories = get_categories(data[1])
+        objects = [o for o, c in data[3]]
         workers = load_aiworker(path, prefix)
         kwargs = {}
         fitness, timing = test_server(dsas, *data, **kwargs)
@@ -125,6 +144,7 @@ if __name__ == "__main__":
         workers_assumed_quality = get_workers_assumed_quality(workers)
         workers_real_quality = get_workers_real_quality(data[2], data[3])
         workers_estimated_quality = get_workers_estimated_quality(dsas, workers)
+        data_quality.append(get_data_estimated_quality(dsas, objects, categories))
         with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
             workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
             workers_quality_writer.writerow(['interval', 'assumed', 'real', 'estimated'])
@@ -134,8 +154,15 @@ if __name__ == "__main__":
             for key in sorted(vals1.iterkeys()):
                 workers_quality_writer.writerow([key, vals1[key], vals2[key], vals3[key]])
         
-    with open('demo/label_fit.csv', 'ab') as labels_fitness_file, open('demo/time.csv', 'ab') as timing_file:
-        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
-        timings_writer = csv.writer(timing_file, delimiter='\t')
-        labels_fitness_writer.writerow([today] + fitnesses)
-        timings_writer.writerow([today] + timings)
+#    with open('demo/time.csv', 'ab') as timing_file:
+#        timings_writer = csv.writer(timing_file, delimiter='\t')
+#        timings_writer.writerow([today] + timings)
+#
+#    with open('demo/label_fit.csv', 'ab') as labels_fitness_file:
+#        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
+#        labels_fitness_writer.writerow([today] + fitnesses)
+
+    with open('demo/data_quality.csv', 'ab') as data_quality_file:
+        data_quality_writer = csv.writer(data_quality_file, delimiter='\t')
+        data_quality_writer.writerow([today] + data_quality)
+

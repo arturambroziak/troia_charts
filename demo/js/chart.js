@@ -103,7 +103,7 @@ var add_line_chart = function(place, datafile, y_axis_txt){
 	});
 };
 
-var add_multiline_chart = function(place, datafile1, datafile2, y_axis_txt){
+var add_multiline_chart = function(place, datafile1, y_axis_txt){
 	var x = d3.time.scale()
     	.range([0, width]);
 
@@ -296,8 +296,9 @@ var add_bar_chart = function(place, datafile, dataset_name, y_axis_txt, x_axis_t
 	});
 }
 
-add_multiline_chart("#label_fit_chart", "label_fit.csv", "Labels fitness (in %)");
+add_multiline_chart("#label_fit_chart", "label_fit.csv", "Object fitness (in %)");
 add_multiline_chart("#time_chart", "time.csv", "Computation timing (in seconds)");
+add_multiline_chart("#data_quality_chart", "data_quality.csv", "How much are we confident that we fit object to its good category");
 
 var datasets =['small', 'medium', 'big']; 
 for (var t in datasets){
