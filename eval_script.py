@@ -53,14 +53,10 @@ def get_workers_real_quality(labels, correct_obj):
 def get_workers_estimated_quality(dsas, workers):
     return [1. - dsas.get_worker_cost(job_id, None, str(w['name']))['result'] for w in workers]
 
-def get_data_estimated_quality(dsas, objects, categories):
-    dsas.calculate_estimated_cost(job_id)
+def get_data_estimated_quality(dsas, objects):
     obj_qualities = 0.
     for o in objects:
-        obj_quality = 1.
-        for c in categories:
-            obj_quality *= dsas.get_estimated_cost(job_id, o, c)['result']
-        obj_qualities += 1. - obj_quality
+        obj_qualities += 1. - dsas.get_estimated_cost(job_id, o)['result']
     return obj_qualities / len(objects)
 
 def get_categories(cost):
@@ -143,7 +139,7 @@ if __name__ == "__main__":
         workers_assumed_quality = get_workers_assumed_quality(workers)
         workers_real_quality = get_workers_real_quality(data[2], data[3])
         workers_estimated_quality = get_workers_estimated_quality(dsas, workers)
-        data_quality.append(get_data_estimated_quality(dsas, objects, categories))
+        data_quality.append(get_data_estimated_quality(dsas, objects))
         with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
             workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
             workers_quality_writer.writerow(['interval', 'assumed', 'real', 'estimated'])
