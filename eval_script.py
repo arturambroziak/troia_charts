@@ -53,11 +53,8 @@ def get_workers_real_quality(labels, correct_obj):
 def get_workers_estimated_quality(dsas, workers):
     return [1. - dsas.get_worker_cost(job_id, None, str(w['name']))['result'] for w in workers]
 
-def get_data_estimated_quality(dsas, objects):
-    obj_qualities = 0.
-    for o in objects:
-        obj_qualities += 1. - dsas.get_estimated_cost(job_id, o)['result']
-    return obj_qualities / len(objects)
+def get_data_estimated_cost(dsas, objects, method):
+    return sum([dsas.get_estimated_cost(job_id, obj, method)['result'] for obj in objects]) / len(objects)
 
 def get_categories(cost):
     s = set()
@@ -122,7 +119,6 @@ if __name__ == "__main__":
     today = datetime.date.today()
     timings = []
     fitnesses = []
-    data_quality = []
     for dataset in ('small', 'medium', 'big'):
         print dataset
         path = "examples/{}/".format(dataset)
@@ -139,7 +135,6 @@ if __name__ == "__main__":
         workers_assumed_quality = get_workers_assumed_quality(workers)
         workers_real_quality = get_workers_real_quality(data[2], data[3])
         workers_estimated_quality = get_workers_estimated_quality(dsas, workers)
-        data_quality.append(get_data_estimated_quality(dsas, objects))
         with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
             workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
             workers_quality_writer.writerow(['interval', 'assumed', 'real', 'estimated'])
@@ -150,6 +145,10 @@ if __name__ == "__main__":
             vals3 = aggregate_values(10, workers_estimated_quality, minv, maxv)
             for key in sorted(vals1.iterkeys()):
                 workers_quality_writer.writerow([key, vals1[key], vals2[key], vals3[key]])
+                
+        with open('demo/data_cost_{}.csv'.format(dataset), 'ab') as data_cost_file:
+            data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
+            data_cost_writer.writerow([today] + [get_data_estimated_cost(dsas, objects, method) for method in ['ExpectedCost', 'ExpectedMVCost', 'MinCost', 'MinMVCost']])
         
     with open('demo/time.csv', 'ab') as timing_file:
         timings_writer = csv.writer(timing_file, delimiter='\t')
@@ -158,8 +157,3 @@ if __name__ == "__main__":
     with open('demo/label_fit.csv', 'ab') as labels_fitness_file:
         labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
         labels_fitness_writer.writerow([today] + fitnesses)
-
-    with open('demo/data_quality.csv', 'ab') as data_quality_file:
-        data_quality_writer = csv.writer(data_quality_file, delimiter='\t')
-        data_quality_writer.writerow([today] + data_quality)
-
