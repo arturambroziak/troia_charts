@@ -6,7 +6,7 @@ from troia_client import TroiaClient
 
 dsas = TroiaClient("http://localhost:8080/GetAnotherLabel/rest/", None)
 main_path = "examples/"
-job_id = "aatest"
+job_id = "test123"
 
 def drange(start, stop, step):
     r = start
@@ -55,6 +55,9 @@ def get_workers_estimated_quality(dsas, workers):
 
 def get_data_estimated_cost(dsas, objects, method):
     return sum([dsas.get_estimated_cost(job_id, obj, method)['result'] for obj in objects]) / len(objects)
+
+def get_data_evaluated_cost(dsas, objects, method):
+    return sum([dsas.get_evaluated_cost(job_id, obj, method)['result'] for obj in objects]) / len(objects)
 
 def get_categories(cost):
     s = set()
@@ -107,6 +110,7 @@ def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
     dsas.load_categories(transform_cost(cost), job_id)
     dsas.load_gold_labels(gold_labels, job_id)
     dsas.load_worker_assigned_labels(labels, job_id)
+    dsas.load_evaluation_labels(correct_objs, job_id)
     dsas.compute_non_blocking(iterations, job_id)
     dsas.is_computed(job_id)
     t2 = datetime.datetime.now()
@@ -148,7 +152,9 @@ if __name__ == "__main__":
                 
         with open('demo/data_cost_{}.csv'.format(dataset), 'ab') as data_cost_file:
             data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
-            data_cost_writer.writerow([today] + [get_data_estimated_cost(dsas, objects, method) for method in ['ExpectedCost', 'ExpectedMVCost', 'MinCost', 'MinMVCost']])
+            data_cost_writer.writerow([today] + 
+                    [get_data_estimated_cost(dsas, objects, method) for method in ['ExpectedCost', 'ExpectedMVCost', 'MinCost', 'MinMVCost']] +
+                    [get_data_evaluated_cost(dsas, objects, method) for method in ['MinCost', 'MinMVCost']])
         
     with open('demo/time.csv', 'ab') as timing_file:
         timings_writer = csv.writer(timing_file, delimiter='\t')

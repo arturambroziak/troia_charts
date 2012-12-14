@@ -136,7 +136,7 @@ var add_multiline_chart = function(place, datafile1, y_axis_txt){
 
 var add_multiline_time_chart = function(place, datafile, dataset_name, y_axis_txt, x_axis_txt){
 	var height = 300 - margin.top - margin.bottom;
-	margin.right = 100;
+	margin.right = 120;
 	var x = d3.time.scale()
 		.range([0, width]);
 
