@@ -155,7 +155,6 @@ var add_multiline_time_chart = function(place, datafile, dataset_name, y_axis_tx
 		.x(function(d) { return x(d.date); })
 		.y(function(d) { return y(d.value); });
 
-	d3.select(place).html("");
 	var svg = d3.select(place).append("svg")
 	    .attr("width", width + margin.left + margin.right)
 	    .attr("height", height + margin.top + margin.bottom)
@@ -234,6 +233,7 @@ var add_bar_chart = function(place, datafile, dataset_name, y_axis_txt, x_axis_t
 		.x(function(d) { return x(d.interval) + x.rangeBand()/2; })
 		.y(function(d) { return y(d.value); });
 
+	d3.select(place).html("");
 	var svg = d3.select(place).append("svg")
 	    .attr("width", width + margin.left + margin.right)
 	    .attr("height", height + margin.top + margin.bottom)
