@@ -1,4 +1,4 @@
-date	Esti_ExpectedCost	Esti_ExpectedMVCost	Esti_MinCost	Esti_MinMVCost	Eval_MinCost	Eval_MinMVCost
-2012-12-12	0.2418043822	0.2277777778	0.16722802	0.178	0.079	0.101
-2012-12-13	0.2418043822	0.2277777778	0.16722802	0.178	0.079	0.101
-2012-12-14	0.2418043822	0.2277777778	0.16722802	0.178	0.079	0.101
+date	Eval_DS_ExpectedCost	Eval_DS_MinCost	Eval_DS_MaxLikelihood	Eval_MV_ExpectedCost	Eval_MV_MinCost	Eval_MV_MaxLikelihood	Estm_DS_MaxLikelihood	Estm_DS_MinCost	Estm_MV_MaxLikelihood	Estm_MV_MinCost
+2013/01/10 12:40:48	0.24	0.17	0.17	0.21	0.16	0.16	0.08	0.08	0.1	0.1
+2013/01/10 12:41:36	0.24	0.17	0.17	0.21	0.16	0.16	0.08	0.08	0.1	0.1
+2013/01/10 13:59:51	0.24	0.17	0.17	0.21	0.16	0.16	0.08	0.08	0.1	0.1

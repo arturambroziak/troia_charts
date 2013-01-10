@@ -2,11 +2,11 @@ import csv
 import datetime
 import json
 
-from troia_client import TroiaClient
+from troia_client.client import TroiaClient
 
-dsas = TroiaClient("http://localhost:8080/GetAnotherLabel/rest/", None)
-main_path = "examples/"
 job_id = "test123"
+tc = TroiaClient("http://localhost:8080/troia-server-0.8", job_id)
+main_path = "examples/"
 
 def drange(start, stop, step):
     r = start
@@ -50,15 +50,6 @@ def get_workers_real_quality(labels, correct_obj):
         ret.append(float(val[0]) / val[1])
     return ret
 
-def get_workers_estimated_quality(dsas, workers):
-    return [1. - dsas.get_worker_cost(job_id, None, str(w['name']))['result'] for w in workers]
-
-def get_data_estimated_cost(dsas, objects, method):
-    return sum([dsas.get_estimated_cost(job_id, obj, method)['result'] for obj in objects]) / len(objects)
-
-def get_data_evaluated_cost(dsas, objects, method):
-    return sum([dsas.get_evaluated_cost(job_id, obj, method)['result'] for obj in objects]) / len(objects)
-
 def get_categories(cost):
     s = set()
     for c1, c2, c in cost:
@@ -97,32 +88,62 @@ def compare_object_results(correct_objs, objs):
             
     return 100 * cnt / len(objs)
 
-def test_server(dsas, gold_labels, cost, labels, correct_objs, **kwargs):
+ALGORITHMS = ["DS", "MV"]
+LABEL_CHOOSING = ["MaxLikelihood", "MinCost"]
+COST_ALGORITHM = ["ExpectedCost", "MinCost", "MaxLikelihood"]
+    
+def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
-        @return: tuple of: labels fitness, computation time
+        @return: tuple of: computation time
     '''
     iterations = kwargs.get("iterations", 30)
     
-    dsas.ping()
-    dsas.reset(job_id)
+    tc.ping()
+    try:
+        tc.delete()
+    except:
+        pass
 
     t1 = datetime.datetime.now()
-    dsas.load_categories(transform_cost(cost), job_id)
-    dsas.load_gold_labels(gold_labels, job_id)
-    dsas.load_worker_assigned_labels(labels, job_id)
-    dsas.load_evaluation_labels(correct_objs, job_id)
-    dsas.compute_non_blocking(iterations, job_id)
-    dsas.is_computed(job_id)
+    tc.create(transform_cost(cost))
+    tc.await_completion(tc.post_gold_data(gold_labels))
+    tc.await_completion(tc.post_assigned_labels(labels))
+    tc.await_completion(tc.post_evaluation_data(correct_objs))
+    tc.await_completion(tc.post_compute(iterations))
     t2 = datetime.datetime.now()
-    
-#    print dsas.print_worker_summary(False, job_id)
-    res_objects = dsas.majority_votes(job_id)
-    return compare_object_results(correct_objs, res_objects['result']), (t2 - t1).seconds
+    return (t2 - t1).seconds
 
+def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti_y, eval_func, eval_x, eval_y):
+    with open('demo/{}_{}.csv'.format(filename, dataset), filemode) as data_cost_file:
+        data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
+        values = []
+        for func, X, Y, name in ((esti_func, esti_x, esti_y, "Eval"), (eval_func, eval_x, eval_y, "Estm")):
+            for x in X:
+                for y in Y:
+                    if filemode == 'w':
+                        values.append("{}_{}_{}".format(name, x, y))
+                    else:
+                        result = tc.await_completion(func(x, y))['result']
+                        values.append(round(sum(result.values()) / len(result), 2)) 
+        data_cost_writer.writerow([first_col_value] + values)
+
+def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, eval_func, eval_x):
+    with open('demo/{}_{}.csv'.format(filename, dataset), filemode) as data_cost_file:
+        data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
+        values = []
+        for func, X, name in ((esti_func, esti_x, "Eval"), (eval_func, eval_x, "Estm")):  
+            for x in X:
+                if filemode == 'w':
+                    values.append("{}_DS_{}".format(name, x))
+                else:
+                    result = tc.await_completion(func(x))['result']
+                    values.append(round(sum(result.values()) / len(result), 2)) 
+        data_cost_writer.writerow([first_col_value] + values)
+        
 if __name__ == "__main__":
-    today = datetime.date.today()
+    today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     timings = []
-    fitnesses = []
+    init = False
     for dataset in ('small', 'medium', 'big'):
         print dataset
         path = "examples/{}/".format(dataset)
@@ -132,34 +153,9 @@ if __name__ == "__main__":
         objects = [o for o, c in data[3]]
         workers = load_aiworker(path, prefix)
         kwargs = {}
-        fitness, timing = test_server(dsas, *data, **kwargs)
-        fitnesses.append(fitness)
-        timings.append(timing)
-        print "fitness: {}, timing: {}".format(fitness, timing)
-        workers_assumed_quality = get_workers_assumed_quality(workers)
-        workers_real_quality = get_workers_real_quality(data[2], data[3])
-        workers_estimated_quality = get_workers_estimated_quality(dsas, workers)
-        with open('demo/workers_quality_{}.csv'.format(dataset), 'w') as workers_quality_file:
-            workers_quality_writer = csv.writer(workers_quality_file, delimiter='\t')
-            workers_quality_writer.writerow(['interval', 'assumed', 'real', 'estimated'])
-            minv = min((min(workers_assumed_quality), min(workers_estimated_quality), min(workers_real_quality)))
-            maxv = max((max(workers_assumed_quality), max(workers_estimated_quality), max(workers_real_quality)))
-            vals1 = aggregate_values(10, workers_assumed_quality, minv, maxv)
-            vals2 = aggregate_values(10, workers_real_quality, minv, maxv)
-            vals3 = aggregate_values(10, workers_estimated_quality, minv, maxv)
-            for key in sorted(vals1.iterkeys()):
-                workers_quality_writer.writerow([key, vals1[key], vals2[key], vals3[key]])
-                
-        with open('demo/data_cost_{}.csv'.format(dataset), 'ab') as data_cost_file:
-            data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
-            data_cost_writer.writerow([today] + 
-                    [get_data_estimated_cost(dsas, objects, method) for method in ['ExpectedCost', 'ExpectedMVCost', 'MinCost', 'MinMVCost']] +
-                    [get_data_evaluated_cost(dsas, objects, method) for method in ['MinCost', 'MinMVCost']])
-        
-    with open('demo/time.csv', 'ab') as timing_file:
-        timings_writer = csv.writer(timing_file, delimiter='\t')
-        timings_writer.writerow([today] + timings)
-
-    with open('demo/label_fit.csv', 'ab') as labels_fitness_file:
-        labels_fitness_writer = csv.writer(labels_fitness_file, delimiter='\t')
-        labels_fitness_writer.writerow([today] + fitnesses)
+        timings.append(test_server(tc, *data, **kwargs))
+        filemode = "w" if init else "ab"
+        first_col_value = "date" if init else today
+        get_data_scores("data_cost", filemode, first_col_value, tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+        get_data_scores("data_quality", filemode, first_col_value, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
+        get_workers_scores("worker_quality", filemode, first_col_value, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
