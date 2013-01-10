@@ -46,7 +46,7 @@ ValueTypeListView = Backbone.View.extend({
 
 var add_multiline_chart = function(place, datafile, dataset_name, y_axis_txt, to_view){ 
 	var margin = {top: 30, right: 120, bottom: 100, left: 50};
-	var width = 900 - margin.left - margin.right;
+	var width = 800 - margin.left - margin.right;
 	var height = 400 - margin.top - margin.bottom;
 
 	var color = d3.scale.category10();
@@ -160,8 +160,8 @@ _.each(_.keys(chart_settings), function(chart_type){
 		var dataset_name = datasets[t];
 		var y_axis_txt = chart_settings[chart_type]["txt"];
 		
-		d3.select(uberplace).append("h4").text(datasets[t] + " data set");
-		d3.select(uberplace).append("div").attr("id", place_id);
+		d3.select(uberplace).append("div").attr("id", place_id).attr("class", "span9");
+		d3.select(place).append("h4").text(datasets[t] + " data set");
 		add_multiline_chart(
 			place, 
 			datafile,
@@ -169,7 +169,7 @@ _.each(_.keys(chart_settings), function(chart_type){
 			y_axis_txt, 
 			chart_settings[chart_type]["metrics"]
 		);
-		d3.select(uberplace).append("div").attr("id", cb_place_id);
+		d3.select(uberplace).append("div").attr("id", cb_place_id).attr("class", "span3");
 		
 		var vts = new ValueTypes();
 		var vtsv = new ValueTypeListView({collection: vts});
