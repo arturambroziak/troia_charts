@@ -1,8 +1,10 @@
+from troia_client.client import TroiaClient
 import csv
 import datetime
 import json
+import os
+import sys
 
-from troia_client.client import TroiaClient
 
 job_id = "test123"
 tc = TroiaClient("http://localhost:8080/troia-server-0.8", job_id)
@@ -98,7 +100,7 @@ def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
     iterations = kwargs.get("iterations", 30)
     
-    tc.ping()
+    tc.status()
     try:
         tc.delete()
     except:
@@ -143,19 +145,24 @@ def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, e
 if __name__ == "__main__":
     today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     timings = []
-    init = False
-    for dataset in ('small', 'medium', 'big'):
-        print dataset
+    for dataset in sys.argv[1:]:
+        print "processing ", dataset
         path = "examples/{}/".format(dataset)
-        prefix = "{}_".format(dataset)
-        data = load_all(path, prefix)
-        categories = get_categories(data[1])
-        objects = [o for o, c in data[3]]
-        workers = load_aiworker(path, prefix)
-        kwargs = {}
-        timings.append(test_server(tc, *data, **kwargs))
-        filemode = "w" if init else "ab"
-        first_col_value = "date" if init else today
-        get_data_scores("data_cost", filemode, first_col_value, tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
-        get_data_scores("data_quality", filemode, first_col_value, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
-        get_workers_scores("worker_quality", filemode, first_col_value, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+        if os.path.exists(path):
+            prefix = "{}_".format(dataset)
+            data = load_all(path, prefix)
+            categories = get_categories(data[1])
+            objects = [o for o, c in data[3]]
+            workers = load_aiworker(path, prefix)
+            kwargs = {}
+            timings.append(test_server(tc, *data, **kwargs))
+            init = not os.path.exists('demo/data_cost_{}.csv'.format(dataset))
+            if init:
+                get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+                get_data_scores("data_quality", "w", "date", tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
+                get_workers_scores("worker_quality", "w", "date", tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+            get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+            get_data_scores("data_quality", "ab", today, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
+            get_workers_scores("worker_quality", "ab", today, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+        else:
+            print path, " doesnt' exists!"
