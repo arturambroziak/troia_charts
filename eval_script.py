@@ -7,9 +7,10 @@ import sys
 
 
 job_id = "test123"
-tc = TroiaClient("http://localhost:8080/troia-server-0.8", job_id)
-main_path = "examples/"
-
+tc = TroiaClient(sys.argv[1], job_id)
+datasets_path = sys.argv[2]
+csv_path = sys.argv[3]
+    
 def drange(start, stop, step):
     r = start
     while r < stop:
@@ -91,7 +92,7 @@ def compare_object_results(correct_objs, objs):
     return 100 * cnt / len(objs)
 
 ALGORITHMS = ["DS", "MV"]
-LABEL_CHOOSING = ["MaxLikelihood", "MinCost"]
+LABEL_CHOOSING = ["MaxLikelihood", "MinCost", "Soft"]
 COST_ALGORITHM = ["ExpectedCost", "MinCost", "MaxLikelihood"]
     
 def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
@@ -116,10 +117,10 @@ def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
     return (t2 - t1).seconds
 
 def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti_y, eval_func, eval_x, eval_y):
-    with open('demo/{}_{}.csv'.format(filename, dataset), filemode) as data_cost_file:
+    with open('{}/{}_{}.csv'.format(csv_path, filename, dataset), filemode) as data_cost_file:
         data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
         values = []
-        for func, X, Y, name in ((esti_func, esti_x, esti_y, "Eval"), (eval_func, eval_x, eval_y, "Estm")):
+        for func, X, Y, name in ((esti_func, esti_x, esti_y, "Estm"), (eval_func, eval_x, eval_y, "Eval")):
             for x in X:
                 for y in Y:
                     if filemode == 'w':
@@ -130,10 +131,10 @@ def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti
         data_cost_writer.writerow([first_col_value] + values)
 
 def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, eval_func, eval_x):
-    with open('demo/{}_{}.csv'.format(filename, dataset), filemode) as data_cost_file:
+    with open('{}/{}_{}.csv'.format(csv_path, filename, dataset), filemode) as data_cost_file:
         data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
         values = []
-        for func, X, name in ((esti_func, esti_x, "Eval"), (eval_func, eval_x, "Estm")):  
+        for func, X, name in ((esti_func, esti_x, "Estm"), (eval_func, eval_x, "Eval")):  
             for x in X:
                 if filemode == 'w':
                     values.append("{}_DS_{}".format(name, x))
@@ -145,9 +146,9 @@ def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, e
 if __name__ == "__main__":
     today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
     timings = []
-    for dataset in sys.argv[1:]:
+    for dataset in sys.argv[4:]:
         print "processing ", dataset
-        path = "examples/{}/".format(dataset)
+        path = "{}/{}/".format(datasets_path, dataset)
         if os.path.exists(path):
             prefix = "{}_".format(dataset)
             data = load_all(path, prefix)
@@ -156,12 +157,12 @@ if __name__ == "__main__":
             workers = load_aiworker(path, prefix)
             kwargs = {}
             timings.append(test_server(tc, *data, **kwargs))
-            init = not os.path.exists('demo/data_cost_{}.csv'.format(dataset))
+            init = not os.path.exists('{}/data_cost_{}.csv'.format(csv_path, dataset))
             if init:
-                get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+                get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
                 get_data_scores("data_quality", "w", "date", tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
                 get_workers_scores("worker_quality", "w", "date", tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
-            get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+            get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
             get_data_scores("data_quality", "ab", today, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
             get_workers_scores("worker_quality", "ab", today, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
         else:
