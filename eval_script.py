@@ -1,31 +1,21 @@
 from troia_client.client import TroiaClient
 import csv
 import datetime
-import json
+import math
 import os
 import sys
 
-
-job_id = "test123"
-tc = TroiaClient(sys.argv[1], job_id)
-datasets_path = sys.argv[2]
-csv_path = sys.argv[3]
-    
 def drange(start, stop, step):
     r = start
     while r < stop:
         yield r
         r += step
 
-def load_all(path, prefix="testData_", suffix=".txt"):
+def load_all(path):
     r = [list(csv.reader(open(path + s), delimiter='\t'))
-            for s in ['/{}goldLabels{}'.format(prefix, suffix), '/{}cost{}'.format(prefix, suffix), '/{}labels{}'.format(prefix, suffix), '/{}objects{}'.format(prefix, suffix)]]
+            for s in ['/goldLabels', '/cost', '/labels', '/objects']]
     r[0] = [x[-2:] for x in r[0]]
     return r
-
-def load_aiworker(path, prefix="testData_", suffix=".txt"):
-    with open(path + '/{}aiworker{}'.format(prefix, suffix)) as aiworker_file:
-        return json.load(aiworker_file)
     
 def get_workers_assumed_quality(workers):
     ret = []
@@ -140,30 +130,34 @@ def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, e
                     values.append("{}_DS_{}".format(name, x))
                 else:
                     result = tc.await_completion(func(x))['result']
-                    values.append(round(sum(result.values()) / len(result), 2)) 
+                    values.append(round(sum((v for v in result.values() if not math.isnan(v))) / len(result), 2)) 
         data_cost_writer.writerow([first_col_value] + values)
         
 if __name__ == "__main__":
-    today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-    timings = []
-    for dataset in sys.argv[4:]:
-        print "processing ", dataset
-        path = "{}/{}/".format(datasets_path, dataset)
-        if os.path.exists(path):
-            prefix = "{}_".format(dataset)
-            data = load_all(path, prefix)
-            categories = get_categories(data[1])
-            objects = [o for o, c in data[3]]
-            workers = load_aiworker(path, prefix)
-            kwargs = {}
-            timings.append(test_server(tc, *data, **kwargs))
-            init = not os.path.exists('{}/data_cost_{}.csv'.format(csv_path, dataset))
-            if init:
-                get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
-                get_data_scores("data_quality", "w", "date", tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
-                get_workers_scores("worker_quality", "w", "date", tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
-            get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
-            get_data_scores("data_quality", "ab", today, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
-            get_workers_scores("worker_quality", "ab", today, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
-        else:
-            print path, " doesnt' exists!"
+    if len(sys.argv) < 4:
+        print "server_path, datasets_path, csv_path, d1, d2, d2.."
+    else:
+        tc = TroiaClient(sys.argv[1], "test123")
+        datasets_path = sys.argv[2]
+        csv_path = sys.argv[3]
+        today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+        timings = []
+        for dataset in sys.argv[4:]:
+            print "processing ", dataset
+            path = "{}/{}/".format(datasets_path, dataset)
+            if os.path.exists(path):
+                data = load_all(path)
+                categories = get_categories(data[1])
+                objects = [o for o, c in data[3]]
+                kwargs = {}
+                timings.append(test_server(tc, *data, **kwargs))
+                init = not os.path.exists('{}/data_cost_{}.csv'.format(csv_path, dataset))
+                if init:
+                    get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+                    get_data_scores("data_quality", "w", "date", tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
+                    get_workers_scores("worker_quality", "w", "date", tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+                get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
+                get_data_scores("data_quality", "ab", today, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
+                get_workers_scores("worker_quality", "ab", today, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+            else:
+                print path, " doesnt' exists!"
