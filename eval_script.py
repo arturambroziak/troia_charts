@@ -1,8 +1,11 @@
+from requests.api import request
 from troia_client.client import TroiaClient
 import csv
 import datetime
 import os
+import requests
 import sys
+import time
 
 def drange(start, stop, step):
     r = start
@@ -141,6 +144,13 @@ if __name__ == "__main__":
         csv_path = sys.argv[3]
         today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
         timings = []
+        for i in xrange(10):
+            resp = requests.get(tc.url + "status")
+            if resp.status_code == 200:
+                break
+            else:
+                print 'waiting for ', tc.url
+                time.sleep(6)
         for dataset in sys.argv[4:]:
             print "processing ", dataset
             path = "{}/{}/".format(datasets_path, dataset)
