@@ -1,7 +1,6 @@
 from troia_client.client import TroiaClient
 import csv
 import datetime
-import math
 import os
 import sys
 
@@ -68,8 +67,9 @@ def aggregate_values(cnt, values, minv=0., maxv=1.):
 def transform_cost(cost):
     dictt = {}
     for c1, c2, cost_ in cost:
-        el = dictt.get(c1, {})
-        el[c2] = cost_
+        el = dictt.get(c1, [])
+        el.append({'categoryName': c2,
+                   'value': cost_})
         dictt[c1] = el
     return dictt.items()
 
@@ -87,15 +87,14 @@ COST_ALGORITHM = ["ExpectedCost", "MinCost", "MaxLikelihood"]
     
 def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
-        @return: tuple of: computation time
+        @return: computation time
     '''
     iterations = kwargs.get("iterations", 30)
     
-    tc.status()
     try:
         tc.delete()
-    except:
-        pass
+    except Exception as ex:
+        print ex
 
     t1 = datetime.datetime.now()
     tc.create(transform_cost(cost))
@@ -117,7 +116,7 @@ def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti
                         values.append("{}_{}_{}".format(name, x, y))
                     else:
                         result = tc.await_completion(func(x, y))['result']
-                        values.append(round(sum(result.values()) / len(result), 2)) 
+                        values.append(round(sum([i['value'] for i in result]) / len(result), 2)) 
         data_cost_writer.writerow([first_col_value] + values)
 
 def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, eval_func, eval_x):
@@ -130,14 +129,14 @@ def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, e
                     values.append("{}_DS_{}".format(name, x))
                 else:
                     result = tc.await_completion(func(x))['result']
-                    values.append(round(sum((v for v in result.values() if not math.isnan(v))) / len(result), 2)) 
+                    values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2)) 
         data_cost_writer.writerow([first_col_value] + values)
         
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print "server_path, datasets_path, csv_path, d1, d2, d2.."
     else:
-        tc = TroiaClient(sys.argv[1], "test123")
+        tc = TroiaClient(sys.argv[1])
         datasets_path = sys.argv[2]
         csv_path = sys.argv[3]
         today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -150,6 +149,7 @@ if __name__ == "__main__":
                 categories = get_categories(data[1])
                 objects = [o for o, c in data[3]]
                 kwargs = {}
+                tc.jid = None
                 timings.append(test_server(tc, *data, **kwargs))
                 init = not os.path.exists('{}/data_cost_{}.csv'.format(csv_path, dataset))
                 if init:
