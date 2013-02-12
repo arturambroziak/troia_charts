@@ -1,5 +1,5 @@
 from requests.api import request
-from troia_client.client import TroiaClient
+from troia_client.client import TroiaClient, prepare_categories_def_prior
 import csv
 import datetime
 import os
@@ -18,7 +18,7 @@ def load_all(path):
             for s in ['/goldLabels', '/cost', '/labels', '/objects']]
     r[0] = [x[-2:] for x in r[0]]
     return r
-    
+
 def get_workers_assumed_quality(workers):
     ret = []
     for w in workers:
@@ -50,7 +50,7 @@ def get_categories(cost):
     for c1, c2, c in cost:
         s.add(c1)
     return s
-    
+
 def aggregate_values(cnt, values, minv=0., maxv=1.):
     ret = {}
     minv = max(round(minv, 1), 0.)
@@ -81,26 +81,26 @@ def compare_object_results(correct_objs, objs):
     for k, v in correct_objs:
         if objs[k] == v:
             cnt += 1
-            
+
     return 100 * cnt / len(objs)
 
 ALGORITHMS = ["DS", "MV"]
 LABEL_CHOOSING = ["MaxLikelihood", "MinCost", "Soft"]
 COST_ALGORITHM = ["ExpectedCost", "MinCost", "MaxLikelihood"]
-    
+
 def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
         @return: computation time
     '''
     iterations = kwargs.get("iterations", 30)
-    
+
     try:
         tc.delete()
     except Exception as ex:
         print ex
 
     t1 = datetime.datetime.now()
-    tc.create(transform_cost(cost))
+    tc.create(prepare_categories_def_prior(transform_cost(cost)))
     tc.await_completion(tc.post_gold_data(gold_labels))
     tc.await_completion(tc.post_assigned_labels(labels))
     tc.await_completion(tc.post_evaluation_data(correct_objs))
@@ -119,22 +119,22 @@ def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti
                         values.append("{}_{}_{}".format(name, x, y))
                     else:
                         result = tc.await_completion(func(x, y))['result']
-                        values.append(round(sum([i['value'] for i in result]) / len(result), 2)) 
+                        values.append(round(sum([i['value'] for i in result]) / len(result), 2))
         data_cost_writer.writerow([first_col_value] + values)
 
 def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, eval_func, eval_x):
     with open('{}/{}_{}.csv'.format(csv_path, filename, dataset), filemode) as data_cost_file:
         data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
         values = []
-        for func, X, name in ((esti_func, esti_x, "Estm"), (eval_func, eval_x, "Eval")):  
+        for func, X, name in ((esti_func, esti_x, "Estm"), (eval_func, eval_x, "Eval")):
             for x in X:
                 if filemode == 'w':
                     values.append("{}_DS_{}".format(name, x))
                 else:
                     result = tc.await_completion(func(x))['result']
-                    values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2)) 
+                    values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2))
         data_cost_writer.writerow([first_col_value] + values)
-        
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print "server_path, datasets_path, csv_path, d1, d2, d2.."
@@ -144,13 +144,14 @@ if __name__ == "__main__":
         csv_path = sys.argv[3]
         today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
         timings = []
-        for i in xrange(10):
-            resp = requests.get(tc.url + "status")
-            if resp.status_code == 200:
-                break
-            else:
-                print 'waiting for ', tc.url
-                time.sleep(6)
+        # for i in xrange(10):
+        #     resp = requests.get(tc.url + "status")
+	#     print resp
+        #     if resp.status_code == 200:
+        #         break
+        #     else:
+        #         print 'waiting for ', tc.url
+        #         time.sleep(6)
         for dataset in sys.argv[4:]:
             print "processing ", dataset
             path = "{}/{}/".format(datasets_path, dataset)
