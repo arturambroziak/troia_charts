@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 from requests.api import request
 from troia_client.client import TroiaClient, prepare_categories_def_prior
 import csv
