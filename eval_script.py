@@ -102,9 +102,19 @@ def create_server(tc, alg, gold_labels, cost, labels, correct_objs, **kwargs):
     return tc
 
 def write_scores(path, filename, dataset, values):
-    with open('{}/{}_{}.csv'.format(path, filename, dataset), "ab") as csv_file:
-        data_cost_writer = csv.writer(csv_file, delimiter='\t')
-        data_cost_writer.writerow(values)
+    def diffrent_values(a, b):
+        for s1, s2 in zip(a, b):
+            if float(s1) != float(s2):
+                return True
+        return False
+    diff = False
+    with open('{}/{}_{}.csv'.format(path, filename, dataset), "r") as csv_file:
+        if diffrent_values(csv_file.readlines()[-1].split()[2:], values[1:]):
+            diff = True
+    if diff:
+        with open('{}/{}_{}.csv'.format(path, filename, dataset), "ab") as csv_file:
+            data_cost_writer = csv.writer(csv_file, delimiter='\t')
+            data_cost_writer.writerow(values)
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
@@ -158,7 +168,7 @@ if __name__ == "__main__":
                                     result = tc[alg].await_completion(getattr(tc[alg], func)(param))['result']
                                     values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2))
                                 else:
-                                    values.append("0.0")
+                                    values.append(0)
                     write_scores(csv_path, s['filename'], dataset, values)
             else:
                 print path, " doesnt' exists!"
