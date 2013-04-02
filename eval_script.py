@@ -1,12 +1,9 @@
 #!/usr/bin/env python2.7
-from requests.api import request
-from troia_client.client import TroiaClient, prepare_categories_def_prior
+from client.gal import TroiaClient
 import csv
 import datetime
 import os
-import requests
 import sys
-import time
 
 def drange(start, stop, step):
     r = start
@@ -85,91 +82,83 @@ def compare_object_results(correct_objs, objs):
 
     return 100 * cnt / len(objs)
 
-ALGORITHMS = ["DS", "MV"]
+ALGORITHMS = ["BDS", "BMV"]
 LABEL_CHOOSING = ["MaxLikelihood", "MinCost", "Soft"]
 COST_ALGORITHM = ["ExpectedCost", "MinCost", "MaxLikelihood"]
 
-def test_server(tc, gold_labels, cost, labels, correct_objs, **kwargs):
+def create_server(tc, alg, gold_labels, cost, labels, correct_objs, **kwargs):
     '''
         @return: computation time
     '''
     iterations = kwargs.get("iterations", 30)
 
-    try:
-        tc.delete()
-    except Exception as ex:
-        print ex
-
-    t1 = datetime.datetime.now()
-    tc.create(prepare_categories_def_prior(transform_cost(cost)))
+    categories = list(set(a for a, _, _ in cost))
+    category_priors = [{"categoryName": c, "value": 1. / len(categories)} for c in categories]
+    tc.create(categories, iterations=iterations, algorithm=alg, categoryPriors=category_priors)
     tc.await_completion(tc.post_gold_data(gold_labels))
     tc.await_completion(tc.post_assigned_labels(labels))
-    tc.await_completion(tc.post_evaluation_data(correct_objs))
-    tc.await_completion(tc.post_compute(iterations))
-    t2 = datetime.datetime.now()
-    return (t2 - t1).seconds
+    tc.await_completion(tc.post_evaluation_objects(correct_objs))
+    tc.await_completion(tc.post_compute())
+    return tc
 
-def get_data_scores(filename, filemode, first_col_value, esti_func, esti_x, esti_y, eval_func, eval_x, eval_y):
-    with open('{}/{}_{}.csv'.format(csv_path, filename, dataset), filemode) as data_cost_file:
-        data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
-        values = []
-        for func, X, Y, name in ((esti_func, esti_x, esti_y, "Estm"), (eval_func, eval_x, eval_y, "Eval")):
-            for x in X:
-                for y in Y:
-                    if filemode == 'w':
-                        values.append("{}_{}_{}".format(name, x, y))
-                    else:
-                        result = tc.await_completion(func(x, y))['result']
-                        values.append(round(sum([i['value'] for i in result]) / len(result), 2))
-        data_cost_writer.writerow([first_col_value] + values)
-
-def get_workers_scores(filename, filemode, first_col_value, esti_func, esti_x, eval_func, eval_x):
-    with open('{}/{}_{}.csv'.format(csv_path, filename, dataset), filemode) as data_cost_file:
-        data_cost_writer = csv.writer(data_cost_file, delimiter='\t')
-        values = []
-        for func, X, name in ((esti_func, esti_x, "Estm"), (eval_func, eval_x, "Eval")):
-            for x in X:
-                if filemode == 'w':
-                    values.append("{}_DS_{}".format(name, x))
-                else:
-                    result = tc.await_completion(func(x))['result']
-                    values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2))
-        data_cost_writer.writerow([first_col_value] + values)
+def write_scores(path, filename, dataset, values):
+    with open('{}/{}_{}.csv'.format(path, filename, dataset), "ab") as csv_file:
+        data_cost_writer = csv.writer(csv_file, delimiter='\t')
+        data_cost_writer.writerow(values)
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print "server_path, datasets_path, csv_path, d1, d2, d2.."
     else:
-        tc = TroiaClient(sys.argv[1])
+        settings = [
+             {'filename': 'data_cost',
+              'esti_function_name': 'get_estimated_objects_cost',
+              'eval_function_name': 'get_evaluated_objects_cost',
+              'esti_algorithms': ALGORITHMS + ['NoVote'],
+              'esti_params': COST_ALGORITHM,
+              'eval_algorithms': ALGORITHMS,
+              'eval_params': LABEL_CHOOSING},
+             {'filename': 'data_quality',
+              'esti_function_name': 'get_estimated_objects_quality',
+              'eval_function_name': 'get_evaluated_objects_quality',
+              'esti_algorithms': ALGORITHMS,
+              'esti_params': COST_ALGORITHM,
+              'eval_algorithms': ALGORITHMS,
+              'eval_params': LABEL_CHOOSING},
+             {'filename': 'worker_quality',
+              'esti_function_name': 'get_estimated_workers_quality',
+              'eval_function_name': 'get_evaluated_workers_quality',
+              'esti_algorithms': ["BDS"],
+              'esti_params': COST_ALGORITHM,
+              'eval_algorithms': ["BDS"],
+              'eval_params': COST_ALGORITHM}]
         datasets_path = sys.argv[2]
         csv_path = sys.argv[3]
         today = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        timings = []
-        # for i in xrange(10):
-        #     resp = requests.get(tc.url + "status")
-	#     print resp
-        #     if resp.status_code == 200:
-        #         break
-        #     else:
-        #         print 'waiting for ', tc.url
-        #         time.sleep(6)
+
         for dataset in sys.argv[4:]:
             print "processing ", dataset
             path = "{}/{}/".format(datasets_path, dataset)
+            tc = {}
             if os.path.exists(path):
                 data = load_all(path)
                 categories = get_categories(data[1])
                 objects = [o for o, c in data[3]]
                 kwargs = {}
-                tc.jid = None
-                timings.append(test_server(tc, *data, **kwargs))
-                init = not os.path.exists('{}/data_cost_{}.csv'.format(csv_path, dataset))
-                if init:
-                    get_data_scores("data_cost", "w", "date", tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
-                    get_data_scores("data_quality", "w", "date", tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
-                    get_workers_scores("worker_quality", "w", "date", tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
-                get_data_scores("data_cost", "ab", today, tc.get_prediction_data_cost, ALGORITHMS + ['NoVote'], COST_ALGORITHM, tc.get_evaluation_data_cost, ALGORITHMS, LABEL_CHOOSING)
-                get_data_scores("data_quality", "ab", today, tc.get_prediction_data_quality, ALGORITHMS, COST_ALGORITHM, tc.get_evaluation_data_quality, ALGORITHMS, LABEL_CHOOSING)
-                get_workers_scores("worker_quality", "ab", today, tc.get_prediction_workers_quality, COST_ALGORITHM, tc.get_evaluation_workers_quality, COST_ALGORITHM)
+                for a in ALGORITHMS:
+                    tc[a] = create_server(TroiaClient(sys.argv[1]), a, *data, **kwargs)
+                
+                for s in settings:
+                    values = [today]
+                    for func, A, P, name in ((s['esti_function_name'], s['esti_algorithms'], s['esti_params'], "Estm"), 
+                                             (s['eval_function_name'], s['eval_algorithms'], s['eval_params'], "Eval")):
+                        for alg in A:
+                            for param in P:
+                                if alg in tc:
+                                    result = tc[alg].await_completion(getattr(tc[alg], func)(param))['result']
+                                    values.append(round(sum((v['value'] if v['value'] != u'NaN' else 0 for v in result)) / len(result), 2))
+                                else:
+                                    values.append("0.0")
+                    write_scores(csv_path, s['filename'], dataset, values)
             else:
                 print path, " doesnt' exists!"
